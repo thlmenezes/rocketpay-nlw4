@@ -4,9 +4,12 @@ defmodule Rocketpay.Accounts.Operation do
   alias Rocketpay.Account
 
   def call(%{"id" => id, "value" => value}, operation) do
+    operation_name = account_operation_name(operation)
+
     Multi.new()
-    |> Multi.run(:account, fn repo, _changes -> get_account(repo, id) end)
-    |> Multi.run(:update_balance, fn repo, %{account: account} ->
+    |> Multi.run(operation_name, fn repo, _changes -> get_account(repo, id) end)
+    |> Multi.run(operation, fn repo, changes ->
+      account = Map.get(changes, operation_name)
       update_balance(repo, account, value, operation)
     end)
   end
@@ -32,6 +35,7 @@ defmodule Rocketpay.Accounts.Operation do
   end
 
   defp validate_number(:error = error), do: error
+
   defp validate_number({:ok, value} = decimal) do
     if Decimal.lt?(value, 0), do: :error, else: decimal
   end
@@ -41,11 +45,17 @@ defmodule Rocketpay.Accounts.Operation do
   defp handle_cast(:error, _balance, _operation), do: {:error, "Invalid deposit value"}
 
   defp update_account({:error, _reason} = error, _repo, _account), do: error
+
   defp update_account(value, repo, account) do
     params = %{balance: value}
 
     account
     |> Account.changeset(params)
     |> repo.update()
+  end
+
+  defp account_operation_name(operation) do
+    "account_#{Atom.to_string(operation)}"
+    |> String.to_atom()
   end
 end
