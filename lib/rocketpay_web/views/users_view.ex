@@ -22,5 +22,4 @@ defmodule RocketpayWeb.UsersView do
       }
     }
   end
-
 end
